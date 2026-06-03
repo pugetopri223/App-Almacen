@@ -1,48 +1,48 @@
 {
-  "expo": {
-    "name": "Moving MEP",
-    "slug": "app-almacen",
-    "version": "1.0.0",
-    "orientation": "portrait",
-    "icon": "./assets/Icon1024.png",
-    "userInterfaceStyle": "light",
-    "ios": {
-      "supportsTablet": true,
-      "infoPlist": {
-        "NSAppTransportSecurity": {
-          "NSAllowsArbitraryLoads": true
-        }
-      },
-      "bundleIdentifier": "com.appalmacen.viewer"
-    },
-    "android": {
-      "package": "com.appalmacen.viewer",
-      "adaptiveIcon": {
-        "backgroundColor": "#85B147",
-        "foregroundImage": "./assets/fondo.jpg",
-        "backgroundImage": "./assets/fondo.jpg"
-      },
-      "softwareKeyboardLayoutMode": "pan"
-    },
-    "plugins": [
-      [
-        "expo-splash-screen",
-        {
-          "image": "./assets/logo_w.png",
-          "imageWidth": 220,
-          "resizeMode": "contain",
-          "backgroundColor": "#85B147"
-        }
-      ],
-      "./plugins/withCleartextTraffic"
-    ],
-    "web": {
-      "favicon": "./assets/favicon2.png"
-    },
-    "extra": {
-      "eas": {
-        "projectId": "f83ae619-dc55-46bb-b95a-a6264365c4a8"
-      }
-    }
-  }
+	"expo": {
+		"name": "Moving MEP",
+		"slug": "app-almacen",
+		"version": "1.0.0",
+		"orientation": "portrait",
+		"icon": "./assets/Icon1024.png",
+		"userInterfaceStyle": "light",
+		"ios": {
+			"supportsTablet": true,
+			"infoPlist": {
+				"NSAppTransportSecurity": {
+					"NSAllowsArbitraryLoads": true
+				}
+			},
+			"bundleIdentifier": "com.appalmacen.viewer"
+		},
+		"android": {
+			"package": "com.appalmacen.viewer",
+			"adaptiveIcon": {
+				"backgroundColor": "#85B147",
+				"foregroundImage": "./assets/Icon1024.png"
+			},
+			"softwareKeyboardLayoutMode": "pan"
+		},
+		"plugins": [
+			[
+				"expo-splash-screen",
+				{
+					"image": "./assets/logo_w.png",
+					"imageWidth": 220,
+					"resizeMode": "contain",
+					"backgroundColor": "#85B147"
+				}
+			],
+			"./plugins/withCleartextTraffic",
+			"expo-font"
+		],
+		"web": {
+			"favicon": "./assets/favicon2.png"
+		},
+		"extra": {
+			"eas": {
+				"projectId": "f83ae619-dc55-46bb-b95a-a6264365c4a8"
+			}
+		}
+	}
 }
