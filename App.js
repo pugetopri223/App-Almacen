@@ -1,5 +1,5 @@
 import { StatusBar } from "expo-status-bar";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import {
 	ActivityIndicator,
 	Alert,
@@ -13,23 +13,53 @@ import {
 	View,
 } from "react-native";
 import { Entypo } from "@expo/vector-icons";
-import { WebView } from "react-native-webview";
 import * as NavigationBar from "expo-navigation-bar";
 
-const DEFAULT_URL = "https://mov.cerraco.mx/";
+const NativeWebView =
+	Platform.OS === "web" ? null : require("react-native-webview").WebView;
+
+const DEFAULT_URL = "http://mov.cerraco.mx/";
+const STORAGE_KEY = "moving-mep-home-url";
 
 export default function App() {
 	const webViewRef = useRef(null);
-
-	const [timestamp, setTimestamp] = useState(Date.now());
 
 	const [loading, setLoading] = useState(true);
 	const [keyboardHeight, setKeyboardHeight] = useState(0);
 	const [homeUrl, setHomeUrl] = useState(DEFAULT_URL);
 	const [tempUrl, setTempUrl] = useState(DEFAULT_URL);
 	const [settingsVisible, setSettingsVisible] = useState(false);
+	const [frameKey, setFrameKey] = useState(0);
+	const [isOnline, setIsOnline] = useState(true);
 
 	useEffect(() => {
+		if (Platform.OS !== "web") {
+			return;
+		}
+
+		const savedUrl = window.localStorage.getItem(STORAGE_KEY);
+		if (savedUrl) {
+			setHomeUrl(savedUrl);
+			setTempUrl(savedUrl);
+		}
+
+		const syncOnlineStatus = () => setIsOnline(window.navigator.onLine);
+		syncOnlineStatus();
+
+		window.addEventListener("online", syncOnlineStatus);
+		window.addEventListener("offline", syncOnlineStatus);
+
+		return () => {
+			window.removeEventListener("online", syncOnlineStatus);
+			window.removeEventListener("offline", syncOnlineStatus);
+		};
+	}, []);
+
+	useEffect(() => {
+		if (Platform.OS === "web") {
+			return undefined;
+		}
+
 		const keyboardDidShow = Keyboard.addListener("keyboardDidShow", (e) => {
 			setKeyboardHeight(e.endCoordinates.height);
 		});
@@ -70,6 +100,10 @@ export default function App() {
 `;
 
 	const hideKeyboard = useCallback(() => {
+		if (Platform.OS === "web") {
+			return;
+		}
+
 		Keyboard.dismiss();
 
 		webViewRef.current?.injectJavaScript(`
@@ -89,6 +123,10 @@ export default function App() {
 	}, []);
 
 	const requestKeyboard = useCallback(() => {
+		if (Platform.OS === "web") {
+			return;
+		}
+
 		webViewRef.current?.injectJavaScript(`
 			(function () {
 				window.__APP_ALLOW_KEYBOARD__ = true;
@@ -116,6 +154,13 @@ export default function App() {
 	}, []);
 
 	const reloadHome = useCallback(() => {
+		setLoading(true);
+
+		if (Platform.OS === "web") {
+			setFrameKey((value) => value + 1);
+			return;
+		}
+
 		webViewRef.current?.injectJavaScript(`
 			window.location.href = ${JSON.stringify(homeUrl)};
 			true;
@@ -135,8 +180,15 @@ export default function App() {
 		}
 
 		setHomeUrl(nextUrl);
+		setTempUrl(nextUrl);
 		setSettingsVisible(false);
 		setLoading(true);
+
+		if (Platform.OS === "web") {
+			window.localStorage.setItem(STORAGE_KEY, nextUrl);
+			setFrameKey((value) => value + 1);
+			return;
+		}
 
 		setTimeout(() => {
 			webViewRef.current?.injectJavaScript(`
@@ -150,6 +202,11 @@ export default function App() {
 		return true;
 	}, []);
 
+	const openSettings = useCallback(() => {
+		setTempUrl(homeUrl);
+		setSettingsVisible(true);
+	}, [homeUrl]);
+
 	return (
 		<View style={styles.safeArea}>
 			<StatusBar hidden={true} />
@@ -159,67 +216,84 @@ export default function App() {
 					style={[
 						styles.webViewContainer,
 						{
-							paddingBottom: keyboardHeight > 0 ? 0 : 54,
+							paddingBottom:
+								Platform.OS === "web"
+									? 54
+									: keyboardHeight > 0
+										? 0
+										: 54,
 						},
 					]}
 				>
-					<WebView
-						ref={webViewRef}
-						source={{ uri: homeUrl }}
-						originWhitelist={["*"]}
-						style={styles.webView}
-						javaScriptEnabled
-						domStorageEnabled
-						pullToRefreshEnabled
-						setSupportMultipleWindows={false}
-						injectedJavaScriptBeforeContentLoaded={
-							injectedJavaScriptBeforeContentLoaded
-						}
-						onShouldStartLoadWithRequest={handleBlockedNavigation}
-						onLoadStart={(e) => {
-							console.log("LOAD START", e.nativeEvent.url);
-							setLoading(true);
-						}}
-						onLoadEnd={() => setLoading(false)}
-						onError={(e) => {
-							console.log(
-								new Date(Date.now()).toLocaleString(),
-								"WEBVIEW ERROR",
-								JSON.stringify(e.nativeEvent, null, 2),
-							);
-							Alert.alert(
-								"Error de carga",
-								"No se pudo cargar la página. Verifica tu conexión o la URL configurada.",
-							);
-						}}
-						onHttpError={(e) => {
-							console.log("HTTP ERROR", JSON.stringify(e.nativeEvent, null, 2));
-						}}
-						renderLoading={() => <LoadingView />}
-						startInLoadingState
-					/>
+					{Platform.OS === "web" ? (
+						<WebFrame
+							frameKey={frameKey}
+							homeUrl={homeUrl}
+							isOnline={isOnline}
+							onLoadStart={() => setLoading(true)}
+							onLoadEnd={() => setLoading(false)}
+							onRetry={reloadHome}
+						/>
+					) : (
+						<NativeWebView
+							ref={webViewRef}
+							source={{ uri: homeUrl }}
+							originWhitelist={["*"]}
+							style={styles.webView}
+							javaScriptEnabled
+							domStorageEnabled
+							pullToRefreshEnabled
+							setSupportMultipleWindows={false}
+							injectedJavaScriptBeforeContentLoaded={
+								injectedJavaScriptBeforeContentLoaded
+							}
+							onShouldStartLoadWithRequest={handleBlockedNavigation}
+							onLoadStart={(e) => {
+								console.log("LOAD START", e.nativeEvent.url);
+								setLoading(true);
+							}}
+							onLoadEnd={() => setLoading(false)}
+							onError={(e) => {
+								console.log(
+									new Date(Date.now()).toLocaleString(),
+									"WEBVIEW ERROR",
+									JSON.stringify(e.nativeEvent, null, 2),
+								);
+								Alert.alert(
+									"Error de carga",
+									"No se pudo cargar la página. Verifica tu conexión o la URL configurada.",
+								);
+							}}
+							onHttpError={(e) => {
+								console.log("HTTP ERROR", JSON.stringify(e.nativeEvent, null, 2));
+							}}
+							renderLoading={() => <LoadingView />}
+							startInLoadingState
+						/>
+					)}
 				</View>
 
 				{loading ? <LoadingView compact /> : null}
 
-				{keyboardHeight === 0 ? (
+				{Platform.OS === "web" || keyboardHeight === 0 ? (
 					<View style={styles.toolbar}>
-						<ToolbarButton
-							onPress={() => {
-								setTempUrl(homeUrl);
-								setSettingsVisible(true);
-							}}
-							label=""
-							icon="cog"
-						/>
+						<ToolbarButton onPress={openSettings} label="" icon="cog" />
 
-						<ToolbarButton onPress={requestKeyboard} label="" icon="keyboard" />
+						{Platform.OS !== "web" ? (
+							<ToolbarButton
+								onPress={requestKeyboard}
+								label=""
+								icon="keyboard"
+							/>
+						) : null}
 
-						<ToolbarButton
-							onPress={hideKeyboard}
-							label=""
-							icon="chevron-thin-down"
-						/>
+						{Platform.OS !== "web" ? (
+							<ToolbarButton
+								onPress={hideKeyboard}
+								label=""
+								icon="chevron-thin-down"
+							/>
+						) : null}
 
 						<ToolbarButton label="" icon="home" onPress={reloadHome} />
 					</View>
@@ -234,7 +308,7 @@ export default function App() {
 			>
 				<View style={styles.modalOverlay}>
 					<View style={styles.modalBox}>
-						<Text style={styles.modalTitle}>Configuración</Text>
+						<Text style={styles.modalTitle}>Configuracion</Text>
 
 						<Text style={styles.modalLabel}>URL del servidor</Text>
 
@@ -245,9 +319,16 @@ export default function App() {
 							autoCorrect={false}
 							keyboardType="url"
 							style={styles.input}
-							placeholder="https://mov.cerraco.mx/"
+							placeholder="http://mov.cerraco.mx/"
 							placeholderTextColor="#8fa1b3"
 						/>
+
+						{Platform.OS === "web" ? (
+							<Text style={styles.helperText}>
+								La PWA funcionara offline como contenedor. El contenido del
+								servidor remoto requiere conexion para actualizarse.
+							</Text>
+						) : null}
 
 						<View style={styles.modalActions}>
 							<Pressable
@@ -271,12 +352,83 @@ export default function App() {
 	);
 }
 
+function WebFrame({ frameKey, homeUrl, isOnline, onLoadStart, onLoadEnd, onRetry }) {
+	useEffect(() => {
+		onLoadStart();
+	}, [frameKey, homeUrl, onLoadStart]);
+
+	useEffect(() => {
+		if (!isOnline) {
+			onLoadEnd();
+			return;
+		}
+
+		const timeoutId = window.setTimeout(() => {
+			window.location.assign(homeUrl);
+		}, 250);
+
+		onLoadEnd();
+
+		return () => window.clearTimeout(timeoutId);
+	}, [frameKey, homeUrl, isOnline, onLoadEnd]);
+
+	if (!isOnline) {
+		return (
+			<View style={styles.offlineContainer}>
+				<View style={styles.offlineCard}>
+					<Text style={styles.offlineTitle}>Modo offline activo</Text>
+					<Text style={styles.offlineText}>
+						La app se abrio sin conexion. Cuando vuelva internet podras recargar
+						el servidor configurado.
+					</Text>
+					<Text style={styles.offlineUrl}>{homeUrl}</Text>
+					<Pressable style={styles.retryButton} onPress={onRetry}>
+						<Text style={styles.retryButtonText}>Reintentar</Text>
+					</Pressable>
+				</View>
+			</View>
+		);
+	}
+
+	return (
+		<View style={styles.offlineContainer}>
+			<View style={styles.offlineCard}>
+				<Text style={styles.offlineTitle}>Redirigiendo al sistema</Text>
+				<Text style={styles.offlineText}>
+					Para permitir el login en web, la app abre el sistema directamente en
+					el dominio remoto en lugar de mantenerlo dentro del contenedor.
+				</Text>
+				<Text style={styles.offlineText}>
+					Si no abre solo, usa alguno de estos botones.
+				</Text>
+				<Text style={styles.offlineUrl}>{homeUrl}</Text>
+				<Pressable
+					style={styles.retryButton}
+					onPress={() => {
+						window.location.assign(homeUrl);
+					}}
+				>
+					<Text style={styles.retryButtonText}>Entrar ahora</Text>
+				</Pressable>
+				<Pressable
+					style={styles.secondaryButton}
+					onPress={() => {
+						window.open(homeUrl, "_blank", "noopener,noreferrer");
+					}}
+				>
+					<Text style={styles.secondaryButtonText}>Abrir en nueva pestana</Text>
+				</Pressable>
+			</View>
+		</View>
+	);
+}
+
 function LoadingView({ compact = false }) {
 	return (
 		<View style={compact ? styles.loadingOverlay : styles.loading}>
 			<ActivityIndicator color="#ffffff" />
 			{!compact ? (
-				<Text style={styles.loadingText}>Cargando almacén...</Text>
+				<Text style={styles.loadingText}>Cargando almacen...</Text>
 			) : null}
 		</View>
 	);
@@ -420,6 +572,12 @@ const styles = StyleSheet.create({
 		paddingVertical: 10,
 		fontSize: 14,
 	},
+	helperText: {
+		color: "#b4c0cb",
+		fontSize: 12,
+		lineHeight: 18,
+		marginTop: 12,
+	},
 	modalActions: {
 		flexDirection: "row",
 		gap: 10,
@@ -439,6 +597,63 @@ const styles = StyleSheet.create({
 		backgroundColor: "#85B147",
 	},
 	modalButtonText: {
+		color: "#ffffff",
+		fontWeight: "800",
+	},
+	offlineContainer: {
+		flex: 1,
+		alignItems: "center",
+		justifyContent: "center",
+		backgroundColor: "#101820",
+		padding: 24,
+	},
+	offlineCard: {
+		width: "100%",
+		maxWidth: 560,
+		backgroundColor: "#18232d",
+		borderRadius: 18,
+		padding: 24,
+		borderWidth: 1,
+		borderColor: "#243241",
+	},
+	offlineTitle: {
+		color: "#ffffff",
+		fontSize: 24,
+		fontWeight: "800",
+		marginBottom: 10,
+	},
+	offlineText: {
+		color: "#d3dde5",
+		fontSize: 15,
+		lineHeight: 22,
+	},
+	offlineUrl: {
+		color: "#85B147",
+		fontSize: 13,
+		fontWeight: "700",
+		marginTop: 14,
+	},
+	retryButton: {
+		alignSelf: "flex-start",
+		marginTop: 18,
+		paddingHorizontal: 18,
+		paddingVertical: 12,
+		borderRadius: 999,
+		backgroundColor: "#85B147",
+	},
+	retryButtonText: {
+		color: "#101820",
+		fontWeight: "800",
+	},
+	secondaryButton: {
+		alignSelf: "flex-start",
+		marginTop: 12,
+		paddingHorizontal: 18,
+		paddingVertical: 12,
+		borderRadius: 999,
+		backgroundColor: "#243241",
+	},
+	secondaryButtonText: {
 		color: "#ffffff",
 		fontWeight: "800",
 	},

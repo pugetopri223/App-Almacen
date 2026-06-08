@@ -37,7 +37,14 @@
 			"expo-font"
 		],
 		"web": {
-			"favicon": "./assets/favicon2.png"
+			"bundler": "metro",
+			"output": "single",
+			"favicon": "./assets/favicon2.png",
+			"name": "Moving MEP",
+			"shortName": "MovingMEP",
+			"themeColor": "#101820",
+			"backgroundColor": "#101820",
+			"display": "standalone"
 		},
 		"extra": {
 			"eas": {

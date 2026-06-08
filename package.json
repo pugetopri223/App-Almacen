@@ -11,8 +11,10 @@
     "expo-status-bar": "~56.0.4",
     "expo-vector-icons": "^10.0.1",
     "react": "19.2.3",
+    "react-dom": "19.2.3",
     "react-native": "0.85.3",
     "react-native-vector-icons": "^10.3.0",
+    "react-native-web": "^0.21.2",
     "react-native-webview": "13.16.1"
   },
   "scripts": {
