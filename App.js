@@ -358,19 +358,8 @@ function WebFrame({ frameKey, homeUrl, isOnline, onLoadStart, onLoadEnd, onRetry
 	}, [frameKey, homeUrl, onLoadStart]);
 
 	useEffect(() => {
-		if (!isOnline) {
-			onLoadEnd();
-			return;
-		}
-
-		const timeoutId = window.setTimeout(() => {
-			window.location.assign(homeUrl);
-		}, 250);
-
 		onLoadEnd();
-
-		return () => window.clearTimeout(timeoutId);
-	}, [frameKey, homeUrl, isOnline, onLoadEnd]);
+	}, [onLoadEnd, frameKey, homeUrl]);
 
 	if (!isOnline) {
 		return (
@@ -393,13 +382,15 @@ function WebFrame({ frameKey, homeUrl, isOnline, onLoadStart, onLoadEnd, onRetry
 	return (
 		<View style={styles.offlineContainer}>
 			<View style={styles.offlineCard}>
-				<Text style={styles.offlineTitle}>Redirigiendo al sistema</Text>
+				<Text style={styles.offlineTitle}>Aplicacion instalada</Text>
 				<Text style={styles.offlineText}>
-					Para permitir el login en web, la app abre el sistema directamente en
-					el dominio remoto en lugar de mantenerlo dentro del contenedor.
+					Esta PWA se queda instalada en tu dispositivo y desde aqui puedes abrir
+					el sistema de almacen cuando lo necesites.
 				</Text>
 				<Text style={styles.offlineText}>
-					Si no abre solo, usa alguno de estos botones.
+					Usa el boton principal para entrar al sistema remoto. Si el servidor
+					requiere login, se abrira en su propio dominio para que la sesion
+					funcione mejor.
 				</Text>
 				<Text style={styles.offlineUrl}>{homeUrl}</Text>
 				<Pressable
@@ -408,7 +399,7 @@ function WebFrame({ frameKey, homeUrl, isOnline, onLoadStart, onLoadEnd, onRetry
 						window.location.assign(homeUrl);
 					}}
 				>
-					<Text style={styles.retryButtonText}>Entrar ahora</Text>
+					<Text style={styles.retryButtonText}>Entrar al sistema</Text>
 				</Pressable>
 				<Pressable
 					style={styles.secondaryButton}
